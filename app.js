@@ -137,7 +137,7 @@ const DEFAULT_NOTIFS = [
 
 const DAYS = ['Нд', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'];
 const DAYS_FULL = ['Неділя', 'Понеділок', 'Вівторок', 'Середа', 'Четвер', 'П’ятниця', 'Субота'];
-const PAGE_TITLES = { dashboard: 'Головна', schedule: 'Розклад', courses: 'Дисципліни', assignments: 'Завдання', grades: 'Залікова книжка', finance: 'Фінанси', library: 'Бібліотека', messages: 'Повідомлення', requests: 'Заявки та довідки', profile: 'Профіль' };
+const PAGE_TITLES = { wheel: 'Фортуна', dashboard: 'Головна', schedule: 'Розклад', courses: 'Дисципліни', assignments: 'Завдання', grades: 'Залікова книжка', finance: 'Фінанси', library: 'Бібліотека', messages: 'Повідомлення', requests: 'Заявки та довідки', profile: 'Профіль' };
 
 /* ---------- state ---------- */
 let state = loadState();
@@ -153,6 +153,7 @@ function defaultState() {
     activeThread: 't1',
     scheduleDay: null,
     scheduleWeek: 'odd',
+    wheel: { spinsLeft: 3, lastDay: '', tickets: [], history: [] },
     profile: { phone: STUDENT.phone, email: STUDENT.email, notifEmail: true, notifPush: true, lang: 'uk' }
   };
 }
@@ -239,6 +240,11 @@ PAGES.dashboard = () => {
       <div style="display:flex;gap:10px"><a href="#schedule" class="btn" style="background:rgba(255,255,255,.2);color:#fff">Розклад</a><a href="#assignments" class="btn" style="background:#fff;color:#0A84FF">Завдання</a></div>
     </div>
   </div>
+  <a href="#wheel" class="card disco-banner" style="display:flex;align-items:center;gap:16px;margin-bottom:16px">
+    <div style="font-size:40px">🪩</div>
+    <div class="grow" style="flex:1"><div style="font-weight:800;font-size:18px">Halloween Disco · 31 жовтня, 21:00</div><div style="opacity:.9">Крутіть «Фортуну» і вигравайте квитки на дискотеку Клодитету. Залишилось спроб сьогодні: <b>${wheelState().spinsLeft}</b></div></div>
+    <span class="btn" style="background:#fff;color:#7E22CE">🎡 Крутити</span>
+  </a>
   <div class="grid c4" style="margin-bottom:16px">
     ${stat('🎓', 'tint-blue', STUDENT.gpa.toFixed(1), 'Середній бал', '#grades')}
     ${stat('🏆', 'tint-orange', `#${STUDENT.rating}`, `Рейтинг у групі з ${STUDENT.groupSize}`, '#grades')}
@@ -377,7 +383,7 @@ window.openAssignment = id => {
     <label style="margin-top:14px"><span>Коментар викладачу</span><textarea id="a-comment" placeholder="Необов’язково"></textarea></label>
     <div class="modal-actions"><button class="btn" onclick="closeModal()">Скасувати</button><button class="btn btn-primary" id="submit-btn" disabled onclick="submitAssignment('${a.id}')">Здати роботу</button></div>`;
   else if (a.status === 'submitted') body += `<div class="chip chip-blue">Здано ${a.submittedAt || ''} · очікує перевірки</div>${a.file ? `<div class="file-pill">📄 ${esc(a.file)}</div>` : ''}<div class="modal-actions"><button class="btn btn-danger" onclick="withdraw('${a.id}')">Відкликати</button><button class="btn btn-primary" onclick="closeModal()">OK</button></div>`;
-  else body += `<div class="card" style="background:#F2F2F7;box-shadow:none"><div style="display:flex;align-items:center;gap:14px"><div class="grade ${gradeClass(a.grade / a.max * 100)}" style="font-size:34px">${a.grade}<span class="muted" style="font-size:16px">/${a.max}</span></div><div><div style="font-weight:600">Відгук викладача</div><div class="muted">${esc(a.feedback || '—')}</div></div></div></div><div class="modal-actions"><button class="btn" onclick="toast('Запит на апеляцію надіслано (імітація)','ok');closeModal()">Апеляція</button><button class="btn btn-primary" onclick="closeModal()">OK</button></div>`;
+  else body += `<div class="card" style="background:var(--card2);box-shadow:none"><div style="display:flex;align-items:center;gap:14px"><div class="grade ${gradeClass(a.grade / a.max * 100)}" style="font-size:34px">${a.grade}<span class="muted" style="font-size:16px">/${a.max}</span></div><div><div style="font-weight:600">Відгук викладача</div><div class="muted">${esc(a.feedback || '—')}</div></div></div></div><div class="modal-actions"><button class="btn" onclick="toast('Запит на апеляцію надіслано (імітація)','ok');closeModal()">Апеляція</button><button class="btn btn-primary" onclick="closeModal()">OK</button></div>`;
   openModal(a.title, body);
   const dz = $('#dz'); if (dz) { dz.ondragover = e => { e.preventDefault(); dz.classList.add('over'); }; dz.ondragleave = () => dz.classList.remove('over'); dz.ondrop = e => { e.preventDefault(); dz.classList.remove('over'); if (e.dataTransfer.files[0]) setFile(e.dataTransfer.files[0].name); }; }
 };
@@ -425,7 +431,7 @@ PAGES.finance = () => {
       <h3 style="margin-top:22px">Реквізити</h3>
       <dl class="kv"><dt>Отримувач</dt><dd>Університет «Клодитет»</dd><dt>IBAN</dt><dd style="font-family:monospace">UA12 3456 7890 0000 0260 0123 4567 8</dd><dt>ЄДРПОУ</dt><dd>01234567</dd><dt>Призначення</dt><dd>Гуртожиток, Лось П., КН-31</dd></dl>
     </div>
-    <div class="card"><h3>Історія операцій</h3><div class="list">${f.history.map(h => `<div class="list-item"><div style="width:38px;height:38px;border-radius:50%;display:grid;place-items:center;background:${h.amount > 0 ? 'rgba(52,199,89,.15)' : '#F2F2F7'}">${h.amount > 0 ? '⬇️' : '⬆️'}</div><div class="grow"><div class="title">${esc(h.title)}</div><div class="sub">${fmtDate(h.date)}</div></div><b style="color:${h.amount > 0 ? '#1E8E3E' : 'inherit'}">${fmtMoney(h.amount)}</b></div>`).join('')}</div></div>
+    <div class="card"><h3>Історія операцій</h3><div class="list">${f.history.map(h => `<div class="list-item"><div style="width:38px;height:38px;border-radius:50%;display:grid;place-items:center;background:${h.amount > 0 ? 'rgba(48,209,88,.18)' : 'var(--card2)'}">${h.amount > 0 ? '⬇️' : '⬆️'}</div><div class="grow"><div class="title">${esc(h.title)}</div><div class="sub">${fmtDate(h.date)}</div></div><b style="color:${h.amount > 0 ? 'var(--green)' : 'inherit'}">${fmtMoney(h.amount)}</b></div>`).join('')}</div></div>
   </div>`;
 };
 window.payDorm = () => {
@@ -476,7 +482,7 @@ PAGES.messages = () => {
     </div>
     <div class="card thread" ${!mobileThread ? 'id="thread-desktop"' : ''}>
       <div style="display:flex;align-items:center;gap:10px;padding-bottom:12px;border-bottom:1px solid var(--line);margin-bottom:10px">
-        <button class="icon-btn" style="box-shadow:none;background:#F2F2F7" onclick="backThreads()">‹</button>
+        <button class="icon-btn" style="box-shadow:none;background:var(--card2)" onclick="backThreads()">‹</button>
         <div class="avatar" style="width:36px;height:36px;font-size:13px">${t.initials}</div><div><div style="font-weight:700">${esc(t.name)}</div><div class="muted small">${esc(t.role)}</div></div>
       </div>
       <div class="thread-body" id="thread-body">${t.msgs.map(m => `<div class="bubble ${m.from}">${esc(m.text)}<span class="t">${m.t}</span></div>`).join('')}</div>
@@ -575,10 +581,95 @@ window.showCard = () => openModal('Студентський квиток', `
     <div style="display:flex;gap:16px;align-items:center;margin:22px 0"><div class="avatar lg" style="background:rgba(255,255,255,.25);border-radius:18px;width:70px;height:70px;font-size:24px">${STUDENT.initials}</div><div><div style="font-size:20px;font-weight:700">${STUDENT.name}</div><div style="opacity:.85">${STUDENT.faculty}</div><div style="opacity:.85">${STUDENT.group} · ${STUDENT.course} курс</div></div></div>
     <div style="display:flex;justify-content:space-between;font-family:monospace;font-size:13px"><span>${STUDENT.ticket}</span><span>до ${STUDENT.cardExpires}</span></div>
   </div>
-  <div style="text-align:center;margin-top:18px"><div style="display:inline-block;padding:10px;background:#fff;border-radius:12px;border:1px solid var(--line)">${qrSvg()}</div><div class="muted small" style="margin-top:6px">Покажіть QR-код для перевірки</div></div>
+  <div style="text-align:center;margin-top:18px"><div style="display:inline-block;padding:10px;background:#fff;border-radius:12px">${qrSvg()}</div><div class="muted small" style="margin-top:6px">Покажіть QR-код для перевірки</div></div>
   <div class="modal-actions"><button class="btn btn-primary" onclick="closeModal()">Закрити</button></div>`);
 function qrSvg() { let s = ''; let seed = 7; for (let y = 0; y < 21; y++) for (let x = 0; x < 21; x++) { seed = (seed * 1103515245 + 12345) & 0x7fffffff; const corner = (x < 7 && y < 7) || (x > 13 && y < 7) || (x < 7 && y > 13); const on = corner ? ((x % 6 === 0 || y % 6 === 0 || (x > 1 && x < 5 && y > 1 && y < 5)) && !(x === 7 || y === 7)) && !((x > 5 && x < 15) || (y > 5 && y < 15) || (x > 13 && y > 13)) : (seed >> 8) % 3 === 0; if (on || (corner && ((x % 6 === 0 && x < 7 && y < 7) || (y % 6 === 0 && x < 7 && y < 7) || (x === 14 || x === 20) && y < 7 || (y === 0 || y === 6) && x > 13 || (x === 0 || x === 6) && y > 13 || (y === 14 || y === 20) && x < 7 || (x > 15 && x < 19 && y > 1 && y < 5) || (x > 1 && x < 5 && y > 15 && y < 19)))) s += `<rect x="${x * 5}" y="${y * 5}" width="5" height="5"/>`; } return `<svg width="120" height="120" viewBox="0 0 105 105" fill="#1C1C1E">${s}</svg>`; }
 window.resetDemo = () => { if (confirm('Скинути всі демо-дані до початкового стану?')) { localStorage.removeItem(STORAGE_KEY); state = defaultState(); state.loggedIn = true; save(); route(); toast('Дані скинуто'); } };
+
+
+/* ---------- wheel of fortune ---------- */
+const PRIZES = [
+  { ico: '🎟️', name: '2 квитки на дискотеку', short: '2 квитки', color: '#FF375F', w: 6, win: true, qty: 2 },
+  { ico: '😅', name: 'Спробуй ще', short: 'Спробуй ще', color: '#3A3A3C', w: 22 },
+  { ico: '🎫', name: '1 квиток на дискотеку', short: '1 квиток', color: '#BF5AF2', w: 14, win: true, qty: 1 },
+  { ico: '🥤', name: 'Безкоштовний напій', short: 'Напій', color: '#64D2FF', w: 14, win: true, qty: 0 },
+  { ico: '👑', name: 'VIP-квиток + фан-зона', short: 'VIP-квиток', color: '#FFD60A', w: 3, win: true, qty: 1, vip: true },
+  { ico: '🙈', name: 'Пусто', short: 'Пусто', color: '#48484A', w: 20 },
+  { ico: '💸', name: 'Знижка 50% на квиток', short: 'Знижка 50%', color: '#30D158', w: 13, win: true, qty: 0 },
+  { ico: '📸', name: 'Фотосесія на диско', short: 'Фотосесія', color: '#FF9F0A', w: 8, win: true, qty: 0 },
+];
+function wheelState() { const w = state.wheel; const d = today().toISOString().slice(0, 10); if (w.lastDay !== d) { w.lastDay = d; w.spinsLeft = 3; save(); } return w; }
+function wheelSvg() {
+  const n = PRIZES.length, R = 50, step = 360 / n; let s = '';
+  PRIZES.forEach((p, i) => {
+    const a0 = (i * step - 90) * Math.PI / 180, a1 = ((i + 1) * step - 90) * Math.PI / 180;
+    const x0 = 50 + R * Math.cos(a0), y0 = 50 + R * Math.sin(a0), x1 = 50 + R * Math.cos(a1), y1 = 50 + R * Math.sin(a1);
+    s += `<path d="M50 50 L${x0} ${y0} A${R} ${R} 0 0 1 ${x1} ${y1} Z" fill="${p.color}" stroke="#000" stroke-opacity=".25" stroke-width=".4"/>`;
+    const mid = i * step + step / 2;
+    s += `<g transform="rotate(${mid - 90} 50 50)"><text x="94" y="51.6" ${p.color === '#FFD60A' || p.color === '#30D158' || p.color === '#64D2FF' ? 'fill="#111"' : ''}>${esc(p.short)}</text></g>`;
+  });
+  return `<svg viewBox="0 0 100 100" class="wheel" id="wheel"><circle cx="50" cy="50" r="50" fill="#000"/>${s}</svg>`;
+}
+PAGES.wheel = () => {
+  const w = wheelState();
+  return `
+  <div class="card disco-banner" style="margin-bottom:16px;display:flex;gap:16px;align-items:center;flex-wrap:wrap">
+    <div style="font-size:44px">🪩</div><div style="flex:1;min-width:220px"><div style="font-weight:800;font-size:20px">Halloween Disco Клодитету</div><div style="opacity:.9">31 жовтня, 21:00 · актова зала головного корпусу · DJ Klod & friends</div></div>
+    <div style="text-align:center"><div style="font-size:28px;font-weight:800">${w.spinsLeft}</div><div style="font-size:12px;opacity:.85">спроб сьогодні</div></div>
+  </div>
+  <div class="grid c2">
+    <div class="card" style="text-align:center">
+      <h3 style="justify-content:center">Крутіть колесо 🎡</h3>
+      <div class="wheel-wrap"><div class="wheel-pointer"></div>${wheelSvg()}<div class="wheel-hub">🎃</div></div>
+      <button class="btn btn-spin" id="spin-btn" style="margin-top:28px" ${w.spinsLeft ? '' : 'disabled'} onclick="spinWheel()">${w.spinsLeft ? 'Крутити!' : 'Спроби на сьогодні вичерпано'}</button>
+      <div class="muted small" style="margin-top:12px">3 спроби на день · квитки іменні, передачі не підлягають · розіграш до 30 жовтня</div>
+    </div>
+    <div>
+      <div class="card" style="margin-bottom:16px"><h3>Мої виграші <span class="chip chip-purple">${w.tickets.length}</span></h3>
+        <div style="display:grid;gap:12px">${w.tickets.map(t => `<div class="ticket"><div style="display:flex;justify-content:space-between;align-items:center;gap:10px"><div><div style="font-weight:700;font-size:16px">${t.ico} ${esc(t.name)}</div><div class="muted small">Halloween Disco · 31.10 · ${esc(STUDENT.name)}</div><div class="code" style="margin-top:6px">${t.code}</div></div><button class="btn btn-small" onclick="showTicket('${t.code}')">QR</button></div></div>`).join('') || '<div class="empty">Поки нічого. Крутіть колесо!</div>'}</div>
+      </div>
+      <div class="card"><h3>Історія спроб</h3><div class="list">${w.history.slice(0, 8).map(h => `<div class="list-item"><span style="font-size:22px">${h.ico}</span><div class="grow"><div class="title">${esc(h.name)}</div><div class="sub">${h.t}</div></div>${h.win ? '<span class="chip chip-green">виграш</span>' : '<span class="chip chip-gray">—</span>'}</div>`).join('') || '<div class="empty">Ще не крутили</div>'}</div></div>
+    </div>
+  </div>`;
+};
+let wheelAngle = 0;
+window.spinWheel = () => {
+  const w = wheelState(); if (!w.spinsLeft) return;
+  const btn = $('#spin-btn'); btn.disabled = true; btn.textContent = 'Крутиться…';
+  const total = PRIZES.reduce((s, p) => s + p.w, 0); let r = Math.random() * total, idx = 0;
+  for (let i = 0; i < PRIZES.length; i++) { r -= PRIZES[i].w; if (r <= 0) { idx = i; break; } }
+  const step = 360 / PRIZES.length; const center = idx * step + step / 2; const jitter = (Math.random() - .5) * step * .7;
+  const current = wheelAngle % 360; const target = (360 - center + jitter + 360) % 360;
+  wheelAngle += 360 * (5 + Math.floor(Math.random() * 3)) + ((target - current + 360) % 360);
+  $('#wheel').style.transform = `rotate(${wheelAngle}deg)`;
+  w.spinsLeft--; save();
+  setTimeout(() => {
+    const p = PRIZES[idx]; const tm = today().toLocaleString('uk-UA', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+    w.history.unshift({ ico: p.ico, name: p.name, win: !!p.win, t: tm });
+    if (p.win) {
+      const code = 'HD-' + Math.random().toString(36).slice(2, 6).toUpperCase() + '-' + Math.random().toString(36).slice(2, 6).toUpperCase();
+      w.tickets.unshift({ ico: p.ico, name: p.name, code, vip: !!p.vip });
+      save(); confetti();
+      addNotif('🪩', 'Виграш у «Фортуні»!', p.name);
+      openModal('🎉 Вітаємо!', `<div style="text-align:center"><div style="font-size:72px;animation:pop .5s">${p.ico}</div><h2 style="margin:8px 0 4px">${esc(p.name)}</h2><p class="muted">Квиток додано до розділу «Мої виграші». Код: <b class="code" style="font-family:monospace;color:var(--teal)">${code}</b></p>${p.vip ? '<p style="margin-top:8px">👑 VIP: окремий вхід, фан-зона біля сцени та безлімітний лимонад.</p>' : ''}<div class="modal-actions" style="justify-content:center"><button class="btn" onclick="closeModal();showTicket('${code}')">Показати QR</button><button class="btn btn-primary" onclick="closeModal();route()">Супер!</button></div></div>`);
+    } else {
+      save();
+      openModal(p.name, `<div style="text-align:center"><div style="font-size:72px">${p.ico}</div><p class="muted" style="margin:10px 0">${idx === 1 ? 'Майже! Колесо дає ще один шанс.' : 'Цього разу без призу. Але є ще спроби!'}</p><div class="modal-actions" style="justify-content:center"><button class="btn btn-primary" onclick="closeModal();route()">${w.spinsLeft ? 'Крутити ще' : 'До завтра'}</button></div></div>`);
+    }
+    if (!location.hash.includes('wheel')) return;
+    const b = $('#spin-btn'); if (b) { b.disabled = !w.spinsLeft; b.textContent = w.spinsLeft ? 'Крутити!' : 'Спроби на сьогодні вичерпано'; }
+  }, 5400);
+};
+window.showTicket = code => {
+  const t = state.wheel.tickets.find(x => x.code === code); if (!t) return;
+  openModal('Квиток', `<div style="border-radius:20px;padding:22px;background:linear-gradient(135deg,#2E1065,#7E22CE,#DB2777);color:#fff"><div style="display:flex;justify-content:space-between"><b>🪩 Halloween Disco</b><span style="opacity:.85;font-size:12px">${t.vip ? 'VIP' : 'STANDARD'}</span></div><div style="font-size:22px;font-weight:800;margin:14px 0 4px">${t.ico} ${esc(t.name)}</div><div style="opacity:.9">${esc(STUDENT.name)} · ${STUDENT.group}</div><div style="opacity:.9">31 жовтня 2026, 21:00 · актова зала</div><div style="font-family:monospace;letter-spacing:.12em;margin-top:14px">${t.code}</div></div>
+  <div style="text-align:center;margin-top:18px"><div style="display:inline-block;padding:10px;background:#fff;border-radius:12px">${qrSvg()}</div><div class="muted small" style="margin-top:6px">Покажіть QR на вході</div></div>
+  <div class="modal-actions"><button class="btn" onclick="toast('Квиток додано в Apple Wallet (імітація)','ok')">Додати в Wallet</button><button class="btn btn-primary" onclick="closeModal()">Закрити</button></div>`);
+};
+function confetti() {
+  const colors = ['#FF375F', '#BF5AF2', '#0A84FF', '#30D158', '#FFD60A', '#FF9F0A', '#64D2FF'];
+  for (let i = 0; i < 120; i++) { const c = document.createElement('div'); c.className = 'confetti'; c.style.left = Math.random() * 100 + 'vw'; c.style.background = colors[i % colors.length]; c.style.animationDuration = 2 + Math.random() * 2.5 + 's'; c.style.animationDelay = Math.random() * .6 + 's'; c.style.borderRadius = Math.random() > .5 ? '50%' : '2px'; document.body.appendChild(c); setTimeout(() => c.remove(), 5500); }
+}
 
 /* ---------- global UI ---------- */
 $('#menu-btn').addEventListener('click', () => $('.sidebar').classList.toggle('open'));
