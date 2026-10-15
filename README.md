@@ -28,11 +28,12 @@
 
 ## Публікація на GitHub Pages
 
-Settings → Pages → Source: *Deploy from a branch* → гілка `main`, папка `/ (root)`.
+Деплой повністю автоматичний через GitHub Actions (`.github/workflows/deploy.yml`): кожен пуш у `main` збирає та публікує сайт.
+
+Одноразове налаштування: **Settings → Pages → Build and deployment → Source: GitHub Actions**.
+
+Після першого пушу сайт буде доступний за адресою `https://<owner>.github.io/student-cab/`.
 
 ## Локальний запуск
 
-```bash
-python3 -m http.server 8080
-# відкрити http://localhost:8080
-```
+Жодних залежностей та збірки: просто відкрийте `index.html` у браузері.
